@@ -1,0 +1,276 @@
+{
+  "name": "AutoFlow IA - M5 Ingesta del Manual (Pinecone)",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## M5 · INGESTA DEL MANUAL EN LA BASE VECTORIAL\n**Pre-Entrega 5 · Módulo 5** · Carga el **Manual de Servicios y Políticas Comerciales de AutoFlow IA** en Pinecone para que W2 lo consulte con `consultar_manual_autoflow`.\n\n**Se ejecuta solo cuando se publica una versión nueva del manual** (gobernanza documental): no corre de forma automática.\n\n**Circuito:** PDF → **LlamaCloud Parse (Agentic)** fuera de n8n → Markdown con jerarquía de títulos y tablas → **este workflow**: carga del .md → fragmentación → embeddings **Gemini (gemini-embedding-001, 3072 dim.)** → **Pinecone** (índice `autoflow-manual`, namespace `manual-servicios`).\n\n**Reemplazo de versión:** *Clear Namespace* borra la versión anterior antes de insertar la nueva. Nunca conviven dos versiones del manual en la base, así el agente no puede recuperar una condición vencida.",
+        "height": 208,
+        "width": 2196,
+        "color": 6
+      },
+      "id": "83b76122-7bc2-41f0-96d4-f5f75131c7c3",
+      "name": "Nota - Ingesta",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -656,
+        144
+      ]
+    },
+    {
+      "parameters": {
+        "formTitle": "Ingesta del Manual de AutoFlow IA",
+        "formDescription": "Suba el Markdown (.md) generado por LlamaCloud Parse a partir de la versión vigente del manual. La carga reemplaza la versión anterior en la base de conocimiento.",
+        "formFields": {
+          "values": [
+            {
+              "fieldLabel": "Manual en Markdown (.md)",
+              "fieldType": "file",
+              "multipleFiles": false,
+              "acceptFileTypes": ".md",
+              "requiredField": true
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "38ee4a89-7db6-4c21-b254-73322253567a",
+      "name": "Subir manual (.md)",
+      "type": "n8n-nodes-base.formTrigger",
+      "typeVersion": 2.2,
+      "position": [
+        -496,
+        688
+      ],
+      "webhookId": "7401139a-22f8-48d4-8bb0-1a67668a2e37"
+    },
+    {
+      "parameters": {
+        "mode": "insert",
+        "pineconeIndex": {
+          "__rl": true,
+          "value": "autoflow-manual",
+          "mode": "list",
+          "cachedResultName": "autoflow-manual"
+        },
+        "options": {
+          "clearNamespace": true,
+          "pineconeNamespace": "manual-servicios"
+        }
+      },
+      "id": "979a2fde-6685-45ac-9f12-553376c725d2",
+      "name": "Cargar en Pinecone",
+      "type": "@n8n/n8n-nodes-langchain.vectorStorePinecone",
+      "typeVersion": 1.1,
+      "position": [
+        128,
+        720
+      ],
+      "credentials": {
+        "pineconeApi": {
+          "id": "REEMPLAZAR_CREDENTIAL_ID",
+          "name": "Pinecone · AutoFlow IA"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "id": "234d6586-dc6e-4f3a-95b6-646721c1d5f9",
+      "name": "Embeddings Gemini",
+      "type": "@n8n/n8n-nodes-langchain.embeddingsGoogleGemini",
+      "typeVersion": 1,
+      "position": [
+        -64,
+        960
+      ],
+      "credentials": {
+        "googlePalmApi": {
+          "id": "REEMPLAZAR_CREDENTIAL_ID",
+          "name": "Gemini · AutoFlow IA"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "dataType": "binary",
+        "textSplittingMode": "custom",
+        "options": {
+          "metadata": {
+            "metadataValues": [
+              {
+                "name": "documento",
+                "value": "Manual de Servicios y Políticas Comerciales de AutoFlow IA"
+              },
+              {
+                "name": "version",
+                "value": "1.0"
+              }
+            ]
+          }
+        }
+      },
+      "id": "ba5c0b98-52ab-4430-ae23-9b7ce261ea0d",
+      "name": "Cargador de documento",
+      "type": "@n8n/n8n-nodes-langchain.documentDefaultDataLoader",
+      "typeVersion": 1.1,
+      "position": [
+        336,
+        944
+      ]
+    },
+    {
+      "parameters": {
+        "chunkSize": 1200,
+        "chunkOverlap": 150,
+        "options": {
+          "splitCode": "markdown"
+        }
+      },
+      "id": "9d771ed2-aa64-48b3-841a-737df65c6398",
+      "name": "Fragmentador Markdown",
+      "type": "@n8n/n8n-nodes-langchain.textSplitterRecursiveCharacterTextSplitter",
+      "typeVersion": 1,
+      "position": [
+        1136,
+        1040
+      ]
+    },
+    {
+      "parameters": {
+        "content": "\n\n\n\n\n\n\n\n\n\n\n\n\n\n### 5 · FRAGMENTADOR MARKDOWN (CHUNKING)\n**Recursive Character Text Splitter** · Markdown\n- **Tamaño:** 1.200 caracteres. Cada subsección del manual (por ejemplo, \"Qué incluye el servicio Chatbots\") mide entre 300 y 1.000 caracteres, así que en general entra completa en un fragmento.\n- **Solapamiento:** 150 caracteres, para no perder contexto cuando una sección se corta.\n- **Separadores Markdown:** prioriza cortar en títulos y párrafos antes que en medio de una oración o de una tabla.\n\n**Metadata de cada fragmento:** documento y versión, para trazabilidad y citación.",
+        "height": 458,
+        "width": 724,
+        "color": 4
+      },
+      "id": "a2efe156-e427-4efd-8f03-6fdca392681b",
+      "name": "Nota - Fragmentador",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        768,
+        928
+      ]
+    },
+    {
+      "parameters": {
+        "content": "### 1 · SUBIR MANUAL (.md)\n**Form Trigger** · punto de entrada manual\n\n- Abre un formulario que acepta **solo archivos .md**.\n- El archivo es el Markdown que genera **LlamaCloud Parse** a partir del PDF del manual, **curado** antes de la carga (orden de tablas, pies de página y jerarquía de títulos).\n- **Quién lo ejecuta:** el responsable del contenido del manual.\n- **Cuándo:** solo al publicar una versión nueva del manual. No corre de forma automática ni lo invoca el Manager.",
+        "height": 540,
+        "width": 400,
+        "color": 5
+      },
+      "id": "4ab690c7-f778-4968-a2ea-25e38510fb27",
+      "name": "Nota - Subir manual",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -656,
+        368
+      ]
+    },
+    {
+      "parameters": {
+        "content": "### 2 · CARGAR EN PINECONE\n**Pinecone Vector Store** · modo *Insert Documents*\n\n- **Índice:** `autoflow-manual` (Serverless, AWS us-east-1, 3072 dim., cosine, *Deletion protection* activa).\n- **Namespace:** `manual-servicios`, el mismo que consulta W2.\n- **Clear Namespace:** borra la versión anterior antes de insertar la nueva. Nunca conviven dos versiones del manual.\n- **Resultado v1.0:** 25 fragmentos cargados.",
+        "height": 540,
+        "width": 960,
+        "color": 2
+      },
+      "id": "46659899-ded1-4123-9b50-20e6db92430f",
+      "name": "Nota - Cargar en Pinecone",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -208,
+        368
+      ]
+    },
+    {
+      "parameters": {
+        "content": "\n\n\n\n\n\n\n\n\n\n\n### 3 · EMBEDDINGS GEMINI\n**models/gemini-embedding-001** · 3072 dimensiones\n\n- Convierte cada fragmento en un vector que representa su significado.\n- **Debe ser el mismo modelo que usa W2** para convertir sus consultas; si cambia uno, cambia el otro y se recarga el manual.\n- La dimensión coincide con la del índice de Pinecone.\n- Claude no ofrece embeddings: se usa Gemini (nivel gratuito).",
+        "height": 460,
+        "width": 404,
+        "color": 4
+      },
+      "id": "ff80b44d-bccf-4e73-8b37-2a7f4ba1e9e4",
+      "name": "Nota - Embeddings",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -208,
+        928
+      ]
+    },
+    {
+      "parameters": {
+        "content": "\n\n\n\n\n\n\n\n\n### 4 · CARGADOR DE DOCUMENTO\n**Default Data Loader** · datos binarios\n\n- Lee el archivo .md recibido en el formulario.\n- Aplica el **Fragmentador Markdown** (división personalizada).\n- Agrega **metadata** a cada fragmento: documento y versión (`1.0`). Permite verificar qué versión del manual está vigente en la base y respalda la citación de fuentes.",
+        "height": 462,
+        "width": 548,
+        "color": 7
+      },
+      "id": "1263c165-4435-430f-9784-b2fef26a55f1",
+      "name": "Nota - Cargador",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        208,
+        928
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Subir manual (.md)": {
+      "main": [
+        [
+          {
+            "node": "Cargar en Pinecone",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Embeddings Gemini": {
+      "ai_embedding": [
+        [
+          {
+            "node": "Cargar en Pinecone",
+            "type": "ai_embedding",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Cargador de documento": {
+      "ai_document": [
+        [
+          {
+            "node": "Cargar en Pinecone",
+            "type": "ai_document",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fragmentador Markdown": {
+      "ai_textSplitter": [
+        [
+          {
+            "node": "Cargador de documento",
+            "type": "ai_textSplitter",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "0404d9fb-c0af-41ed-a40e-416680400fc8",
+  "meta": {},
+  "nodeGroups": [],
+  "id": "IO84pk2roWwn7iLM",
+  "tags": []
+}
